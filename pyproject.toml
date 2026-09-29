@@ -1,0 +1,18 @@
+[project]
+name = "hello-jev"
+version = "0.1.0"
+description = "Central de Atendimento com JEV — demo"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "typesafe-sdk",
+    "python-dotenv>=1.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

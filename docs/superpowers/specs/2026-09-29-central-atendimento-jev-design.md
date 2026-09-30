@@ -71,9 +71,12 @@ Textos exatos das instructions/criteria ficam em `app/pipeline.py`, em inglês.
 Limiares em `app/config.py`:
 
 1. `injection.noul > 0.5` ou `abusive.noul > 0.5` → **`blocked`** (🛑 bloqueado).
-2. `team.confidence < 0.6` ou `complexity.confidence < 0.6` → **`human_review`** (👤 revisão humana).
-3. `refund.noul > 0.5` ou `sentiment.score >= 2` (very angry) → **`human_priority`** (👤 humano prioritário).
-4. Senão, automático conforme `complexity.choice`:
+2. `team.confidence < 0.6` → **`human_review`** (👤 revisão humana).
+3. `refund.noul > 0.5` ou `sentiment.score >= 1.5` (mais perto de very angry) → **`human_priority`** (👤 humano prioritário).
+4. `complexity.confidence < 0.6` → **`human_review`**. A complexidade só importa para automatizar, por isso é
+   checada depois das rotas humanas (ajuste feito após validar com o JEV real: casos de reembolso e cliente
+   furioso estavam caindo em revisão por dúvida de complexidade, irrelevante quando um humano vai atender).
+5. Senão, automático conforme `complexity.choice`:
    - `faq` → **`template`** (resposta pronta, custo US$0)
    - `simple` → **`llm_small`**
    - `complex` → **`llm_large`**

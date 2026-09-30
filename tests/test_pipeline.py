@@ -113,3 +113,13 @@ def test_costs_for_template_are_almost_all_savings():
     c = costs(input_tokens=500, route="template")
     assert c.route_usd == 0
     assert c.savings_pct > 99
+
+
+def test_priority_ignores_complexity_uncertainty():
+    # complexidade só importa para automatizar; se vai para humano de qualquer forma, a dúvida é irrelevante
+    assert decide(answers(refund=noul(0.98), complexity=choice("complex", 0.5))).route == "human_priority"
+    assert decide(answers(sentiment=score(2.0), complexity=choice("complex", 0.56))).route == "human_priority"
+
+
+def test_team_uncertainty_still_wins_over_priority():
+    assert decide(answers(team=choice("billing", 0.4), refund=noul(0.98))).route == "human_review"

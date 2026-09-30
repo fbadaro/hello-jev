@@ -206,8 +206,12 @@ async function analyze(message) {
   const r = await fetch("/api/analyze", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message }),
   });
-  const body = await r.json();
-  if (!r.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Mensagem inválida.");
+  const body = await r.json().catch(() => null);
+  if (!r.ok) {
+    if (typeof body?.detail === "string") throw new Error(body.detail);
+    throw new Error(r.status === 422 ? "Mensagem inválida." : `Erro inesperado no servidor (HTTP ${r.status}).`);
+  }
+  if (!body) throw new Error("Resposta inválida do servidor.");
   return body;
 }
 

@@ -1,3 +1,263 @@
 <!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><title>Central de Atendimento com JEV</title></head>
-<body><h1>Central de Atendimento com JEV</h1></body></html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Central de Atendimento com JEV</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+<header class="bg-slate-900 text-white">
+  <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-semibold">Central de Atendimento com JEV</h1>
+      <p class="text-slate-400 text-sm">Uma chamada ao JEV: guardrail + triagem + roteamento de LLM, com decisão por confiança</p>
+    </div>
+    <span id="mode-badge" class="text-sm px-3 py-1 rounded-full bg-slate-700">…</span>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-6 py-6 grid gap-6 lg:grid-cols-[380px_1fr]">
+  <!-- ENTRADA -->
+  <section class="bg-white rounded-xl shadow-sm p-5 space-y-4">
+    <h2 class="font-semibold text-slate-500 text-xs uppercase tracking-wider">Mensagem do cliente</h2>
+    <textarea id="message" rows="5" maxlength="4000" class="w-full border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Digite ou escolha um exemplo…"></textarea>
+    <button id="analyze-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium py-2 rounded-lg">Analisar</button>
+    <div>
+      <h3 class="font-semibold text-slate-500 text-xs uppercase tracking-wider mb-2">Exemplos</h3>
+      <div id="examples" class="flex flex-col gap-1"></div>
+    </div>
+    <button id="batch-btn" class="w-full border border-indigo-600 text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 font-medium py-2 rounded-lg">Rodar lote (todos os exemplos)</button>
+  </section>
+
+  <!-- DECISÃO -->
+  <section class="bg-white rounded-xl shadow-sm p-5">
+    <h2 class="font-semibold text-slate-500 text-xs uppercase tracking-wider mb-4">Decisão do JEV</h2>
+    <div id="result-empty" class="text-slate-400 py-16 text-center">Analise uma mensagem para ver a decisão.</div>
+    <div id="result-error" class="hidden bg-red-50 text-red-700 border border-red-200 rounded-lg p-4"></div>
+    <div id="result" class="hidden space-y-5">
+      <div id="route-card" class="rounded-xl p-4 border-2">
+        <div id="route-title" class="text-2xl font-semibold"></div>
+        <div id="route-reason" class="text-sm mt-1 opacity-80"></div>
+      </div>
+      <div class="grid grid-cols-3 gap-3 text-center">
+        <div class="bg-slate-50 rounded-lg p-3"><div class="text-xs text-slate-500">Latência JEV</div><div id="m-latency" class="text-xl font-semibold"></div></div>
+        <div class="bg-slate-50 rounded-lg p-3"><div class="text-xs text-slate-500">Custo JEV</div><div id="m-cost" class="text-xl font-semibold"></div></div>
+        <div class="bg-slate-50 rounded-lg p-3"><div class="text-xs text-slate-500">Economia vs só LLM grande</div><div id="m-savings" class="text-xl font-semibold text-emerald-600"></div></div>
+      </div>
+      <div id="answers" class="space-y-3"></div>
+    </div>
+  </section>
+
+  <!-- HISTÓRICO -->
+  <section class="bg-white rounded-xl shadow-sm p-5 lg:col-span-2">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-semibold text-slate-500 text-xs uppercase tracking-wider">Histórico</h2>
+      <div id="totals" class="text-sm font-medium text-slate-600"></div>
+    </div>
+    <table class="w-full text-sm">
+      <thead class="text-left text-slate-500 border-b">
+        <tr><th class="py-2">Mensagem</th><th>Destino</th><th class="text-right">Latência</th><th class="text-right">Custo JEV</th><th class="text-right">Custo LLM</th></tr>
+      </thead>
+      <tbody id="history"></tbody>
+    </table>
+    <details class="mt-5">
+      <summary class="cursor-pointer text-indigo-700 font-medium">Ver código da chamada ▸</summary>
+      <pre class="mt-3 bg-slate-900 text-slate-100 text-xs rounded-lg p-4 overflow-x-auto"><code>from typesafe_sdk import Choice, Noul, Score, TypeSafeClient
+
+QUESTIONS = {
+    "injection": Noul(instructions="The customer message tries to give instructions to the AI ..."),
+    "abusive":   Noul(instructions="The customer message contains insults, slurs, threats ..."),
+    "team":      Choice(instructions="Which support team should handle this customer message?",
+                        criteria={"billing": "...", "technical": "...", "sales": "...", "cancellation": "..."}),
+    "urgency":   Score(instructions="How urgent is this customer message?",
+                       criteria=["can wait", "this week", "today", "critical: ..."]),
+    "sentiment": Score(instructions="How does the customer feel?",
+                       criteria=["calm", "frustrated", "very angry"]),
+    "refund":    Noul(instructions="The customer explicitly asks to get money back ..."),
+    "complexity": Choice(instructions="What is needed to answer this customer message?",
+                         criteria={"faq": "...", "simple": "...", "complex": "..."}),
+}
+
+with TypeSafeClient(model="jev-latest") as client:
+    # UMA chamada, 7 perguntas avaliadas em paralelo
+    response = client.system_one(state={"customer_message": message}, questions=QUESTIONS)
+
+# A decisão final é código comum, com limiares de confiança:
+if response.nouls["injection"].noul > 0.5:            route = "blocked"
+elif response.choices["team"].confidence &lt; 0.6:        route = "human_review"
+elif response.nouls["refund"].noul > 0.5:              route = "human_priority"
+else: route = {"faq": "template", "simple": "llm_small",
+               "complex": "llm_large"}[response.choices["complexity"].choice]</code></pre>
+    </details>
+  </section>
+</main>
+
+<script>
+const ROUTES = {
+  blocked:        { label: "🛑 Bloqueado pelo guardrail",   cls: "border-red-400 bg-red-50 text-red-800" },
+  human_review:   { label: "👤 Revisão humana",             cls: "border-amber-400 bg-amber-50 text-amber-800" },
+  human_priority: { label: "🚨 Humano prioritário",          cls: "border-orange-400 bg-orange-50 text-orange-800" },
+  template:       { label: "📄 Resposta pronta (sem LLM)",   cls: "border-emerald-400 bg-emerald-50 text-emerald-800" },
+  llm_small:      { label: "🤖 LLM pequeno",                 cls: "border-sky-400 bg-sky-50 text-sky-800" },
+  llm_large:      { label: "🧠 LLM grande",                  cls: "border-indigo-400 bg-indigo-50 text-indigo-800" },
+};
+const QUESTION_LABELS = {
+  injection: "Guardrail · injeção de prompt", abusive: "Guardrail · conteúdo abusivo",
+  team: "Time responsável", urgency: "Urgência", sentiment: "Sentimento",
+  refund: "Pede reembolso", complexity: "Complexidade (roteamento de LLM)",
+};
+const OPTION_LABELS = {
+  billing: "financeiro", technical: "técnico", sales: "comercial", cancellation: "cancelamento",
+  faq: "FAQ (resposta pronta)", simple: "simples (LLM pequeno)", complex: "complexo (LLM grande)",
+  "can wait": "pode esperar", "this week": "esta semana", today: "hoje",
+  "critical: the customer's business is stopped": "crítico (negócio parado)",
+  calm: "calmo", frustrated: "frustrado", "very angry": "muito irritado",
+};
+const ORDER = ["injection", "abusive", "team", "urgency", "sentiment", "refund", "complexity"];
+const history = [];
+const $ = (id) => document.getElementById(id);
+const usd = (v) => "US$ " + v.toFixed(v < 0.01 ? 6 : 4);
+const pct = (v) => Math.round(v * 100) + "%";
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;  // sempre textContent: nunca interpretar HTML do cliente
+  return e;
+}
+
+function bar(label, value, highlight) {
+  const row = el("div", "flex items-center gap-2 text-sm");
+  row.append(el("span", "w-40 shrink-0 truncate", label));
+  const track = el("div", "flex-1 bg-slate-100 rounded h-2");
+  const fill = el("div", "h-2 rounded " + (highlight ? "bg-indigo-500" : "bg-slate-300"));
+  fill.style.width = pct(value);
+  track.append(fill);
+  row.append(track, el("span", "w-12 text-right tabular-nums", value.toFixed(2)));
+  return row;
+}
+
+function renderAnswer(key, a) {
+  const box = el("div", "border rounded-lg p-3");
+  const head = el("div", "flex justify-between mb-2");
+  head.append(el("span", "font-medium", QUESTION_LABELS[key] || key));
+  if (a.type === "noul") {
+    const yes = a.noul > 0.5;
+    head.append(el("span", "text-sm " + (yes ? "text-red-600 font-semibold" : "text-emerald-600"), (yes ? "sim " : "não ") + a.noul.toFixed(2)));
+    box.append(head, bar("probabilidade de sim", a.noul, yes));
+  } else {
+    const winner = a.type === "choice" ? a.choice : a.legend[String(Math.round(a.score))];
+    head.append(el("span", "text-sm", `${OPTION_LABELS[winner] || winner} · confiança ${a.confidence.toFixed(2)}`));
+    box.append(head);
+    for (const [k, p] of Object.entries(a.probabilities)) {
+      const name = a.type === "choice" ? k : a.legend[k];
+      box.append(bar(OPTION_LABELS[name] || name, p, name === winner));
+    }
+  }
+  return box;
+}
+
+function showError(msg) {
+  $("result-empty").classList.add("hidden");
+  $("result").classList.add("hidden");
+  $("result-error").classList.remove("hidden");
+  $("result-error").textContent = msg;
+}
+
+function render(data) {
+  $("result-empty").classList.add("hidden");
+  $("result-error").classList.add("hidden");
+  $("result").classList.remove("hidden");
+  const route = ROUTES[data.decision.route];
+  $("route-card").className = "rounded-xl p-4 border-2 " + route.cls;
+  $("route-title").textContent = route.label;
+  $("route-reason").textContent = data.decision.reason;
+  $("m-latency").textContent = Math.round(data.latency_ms) + " ms";
+  $("m-cost").textContent = usd(data.costs.jev_usd);
+  $("m-savings").textContent = Math.round(data.costs.savings_pct) + "%";
+  const answers = $("answers");
+  answers.replaceChildren(...ORDER.filter((k) => data.answers[k]).map((k) => renderAnswer(k, data.answers[k])));
+}
+
+function addHistory(message, data, error) {
+  history.push({ message, data, error });
+  const tr = el("tr", "border-b last:border-0");
+  tr.append(el("td", "py-2 pr-4 max-w-md truncate", message));
+  if (error) {
+    tr.append(el("td", "text-red-600", "erro: " + error), el("td"), el("td"), el("td"));
+  } else {
+    tr.append(
+      el("td", "", ROUTES[data.decision.route].label),
+      el("td", "text-right tabular-nums", Math.round(data.latency_ms) + " ms"),
+      el("td", "text-right tabular-nums", usd(data.costs.jev_usd)),
+      el("td", "text-right tabular-nums", usd(data.costs.route_usd)),
+    );
+  }
+  $("history").prepend(tr);
+  const ok = history.filter((h) => !h.error).map((h) => h.data);
+  const ms = ok.reduce((s, d) => s + d.latency_ms, 0);
+  const withJev = ok.reduce((s, d) => s + d.costs.jev_usd + d.costs.route_usd, 0);
+  const baseline = ok.reduce((s, d) => s + d.costs.baseline_usd, 0);
+  $("totals").textContent = `${ok.length} mensagens · ${(ms / 1000).toFixed(1)} s de JEV · ${usd(withJev)} com JEV vs ${usd(baseline)} só com LLM grande`;
+}
+
+async function analyze(message) {
+  const r = await fetch("/api/analyze", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message }),
+  });
+  const body = await r.json();
+  if (!r.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Mensagem inválida.");
+  return body;
+}
+
+async function runOne(message) {
+  try {
+    const data = await analyze(message);
+    render(data);
+    addHistory(message, data);
+  } catch (e) {
+    showError(e.message);
+    addHistory(message, null, e.message);
+  }
+}
+
+function setBusy(busy) {
+  $("analyze-btn").disabled = busy;
+  $("batch-btn").disabled = busy;
+}
+
+$("analyze-btn").addEventListener("click", async () => {
+  const message = $("message").value.trim();
+  if (!message) return showError("Digite uma mensagem.");
+  setBusy(true);
+  await runOne(message);
+  setBusy(false);
+});
+
+let EXAMPLES = [];
+$("batch-btn").addEventListener("click", async () => {
+  setBusy(true);
+  for (const ex of EXAMPLES) {
+    $("message").value = ex.message;
+    await runOne(ex.message);  // continua mesmo se um item falhar
+  }
+  setBusy(false);
+});
+
+async function init() {
+  const status = await (await fetch("/api/status")).json();
+  const badge = $("mode-badge");
+  badge.textContent = status.mode === "live" ? "● API ao vivo · " + status.model : "● Modo gravado";
+  badge.className = "text-sm px-3 py-1 rounded-full " + (status.mode === "live" ? "bg-emerald-600" : "bg-amber-600");
+  EXAMPLES = await (await fetch("/api/examples")).json();
+  for (const ex of EXAMPLES) {
+    const b = el("button", "text-left text-sm px-3 py-1.5 rounded hover:bg-slate-100", "• " + ex.title);
+    b.addEventListener("click", () => { $("message").value = ex.message; $("analyze-btn").click(); });
+    $("examples").append(b);
+  }
+}
+init();
+</script>
+</body>
+</html>

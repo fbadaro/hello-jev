@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from typesafe_sdk import TypeSafeClient, TypeSafeError
+from typesafe_sdk import RetryPolicy, TypeSafeClient, TypeSafeError
 
 from app import config
 from app.pipeline import QUESTIONS
@@ -59,9 +59,20 @@ def normalize_response(response) -> tuple[str, dict, int]:
     return response.model, answers, tokens
 
 
+_client = None
+
+
+def _get_client():
+    # Um cliente reaproveitado: a latência medida não inclui abrir conexão (TCP/TLS) a cada chamada.
+    # Sem retries e com timeout curto: ao vivo, é melhor falhar rápido e trocar para o modo gravado.
+    global _client
+    if _client is None:
+        _client = TypeSafeClient(model=config.MODEL, timeout=5, retry=RetryPolicy(max_retries=0))
+    return _client
+
+
 def _call_live(message: str):
-    with TypeSafeClient(model=config.MODEL, timeout=10) as client:
-        return client.system_one(state={"customer_message": message}, questions=QUESTIONS)
+    return _get_client().system_one(state={"customer_message": message}, questions=QUESTIONS)
 
 
 def _analyze_live(message: str) -> JevResult:
@@ -69,7 +80,7 @@ def _analyze_live(message: str) -> JevResult:
     try:
         response = _call_live(message)
     except TypeSafeError as e:
-        raise JevError(f"Falha ao chamar o JEV: {e}. Dica: use o modo gravado (JEV_MODE=recorded).") from e
+        raise JevError(f"Falha ao chamar o JEV: {str(e).rstrip('.')}. Dica: use o modo gravado (JEV_MODE=recorded).") from e
     latency_ms = (time.perf_counter() - start) * 1000
     model, answers, tokens = normalize_response(response)
     return JevResult(model=model, answers=answers, input_tokens=tokens, latency_ms=latency_ms, mode="live")

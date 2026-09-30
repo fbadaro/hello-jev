@@ -113,3 +113,26 @@ def test_live_measures_latency(monkeypatch):
     assert r.mode == "live"
     assert r.model == "jev-1.13.0"
     assert r.latency_ms >= 0
+
+
+class FakeClient:
+    instances = []
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+        FakeClient.instances.append(self)
+
+    def system_one(self, state, questions):
+        return fake_response()
+
+
+def test_live_client_fails_fast_and_is_reused(monkeypatch):
+    FakeClient.instances = []
+    monkeypatch.setattr(jev_client, "TypeSafeClient", FakeClient)
+    monkeypatch.setattr(jev_client, "_client", None)
+    analyze("um", mode="live")
+    analyze("dois", mode="live")
+    assert len(FakeClient.instances) == 1  # conexão reaproveitada: latência sem setup de TCP/TLS
+    kwargs = FakeClient.instances[0].kwargs
+    assert kwargs["retry"].max_retries == 0  # falha rápido na apresentação em vez de travar ~30 s
+    assert kwargs["timeout"] <= 5

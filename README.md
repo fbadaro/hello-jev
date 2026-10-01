@@ -15,6 +15,8 @@ Cada mensagem de cliente passa por **uma única chamada** ao JEV com 7 perguntas
 As regras finais são código Python (`app/pipeline.py`), com **gating por confiança**:
 bloqueio → revisão humana (confiança < 0,6) → humano prioritário → resposta pronta / LLM pequeno / LLM grande.
 
+**Apresentação:** https://fbadaro.github.io/hello-jev/ (fonte em `presentation/index.html`)
+
 ## Rodando
 
 ```bash

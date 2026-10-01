@@ -1,0 +1,43 @@
+name: Publicar apresentação no GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["presentation/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      # presentation/index.html é escrito sem <!doctype>/<head> (formato de artefato);
+      # aqui ele ganha o documento completo para ser servido como página estática.
+      - name: Montar página
+        run: |
+          mkdir -p _site
+          {
+            printf '<!doctype html>\n<html lang="pt-BR">\n<head>\n<meta charset="utf-8">\n'
+            printf '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
+            printf '<style>body{margin:0}img{max-width:100%%}[hidden]{display:none!important}</style>\n</head>\n<body>\n'
+            cat presentation/index.html
+            printf '\n</body>\n</html>\n'
+          } > _site/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

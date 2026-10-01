@@ -1,0 +1,824 @@
+<title>JEV em 9 Cenários</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: deck de slides em tela cheia; cada slide é uma grade texto + diagrama animado que empilha no celular */
+:root {
+  --bg: #e9eef1;        /* cinza frio, chão da sala de controle */
+  --surface: #ffffff;
+  --fg: #12202a;        /* tinta azul-petróleo */
+  --muted: #5a6b77;
+  --line: #c3cfd7;
+  --accent: #d9531e;    /* sinal: a decisão */
+  --prob: #2b6a98;      /* probabilidades */
+  --ok: #2c8763;
+  --warn: #b98a12;
+  --bad: #c23b3b;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e151b; --surface: #16212a; --fg: #e3eaef; --muted: #91a2ae; --line: #2b3b47;
+    --accent: #ff7a42; --prob: #6db0e3; --ok: #4fbf8f; --warn: #e2b23c; --bad: #ef6b6b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e151b; --surface: #16212a; --fg: #e3eaef; --muted: #91a2ae; --line: #2b3b47;
+  --accent: #ff7a42; --prob: #6db0e3; --ok: #4fbf8f; --warn: #e2b23c; --bad: #ef6b6b;
+  color-scheme: dark;
+}
+
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.5; }
+
+.deck {
+  position: fixed; inset: 0; overflow: hidden; background: var(--bg);
+  padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.slide {
+  position: absolute; inset: 0 0 56px 0; overflow-y: auto;
+  padding-block: clamp(20px, 5vh, 56px); padding-inline: clamp(16px, 5vw, 80px);
+  display: grid; align-content: center; gap: clamp(16px, 3vh, 32px);
+  opacity: 0; visibility: hidden; transition: opacity .35s ease, visibility .35s;
+}
+.slide.active { opacity: 1; visibility: visible; }
+
+.eyebrow { font-family: var(--font-mono); font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 0; }
+h1, h2 { font-family: var(--font-display); font-weight: 800; letter-spacing: -.02em; line-height: 1.05; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(2.4rem, 6.5vw, 5.4rem); }
+h2 { font-size: clamp(1.7rem, 3.6vw, 3rem); }
+h3 { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; margin: 0; }
+p { margin: 0; max-width: 62ch; }
+.lead { font-size: clamp(1.05rem, 1.6vw, 1.3rem); color: var(--muted); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.src { font-size: .78rem; color: var(--muted); font-family: var(--font-mono); }
+.src a { color: inherit; }
+.hl { color: var(--accent); }
+
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: clamp(20px, 4vw, 56px); align-items: center; }
+.split > * { min-width: 0; }
+.stack { display: grid; gap: 14px; align-content: start; }
+.cols-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.cols-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.cols-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 900px) {
+  .split, .cols-2, .cols-3, .cols-4 { grid-template-columns: minmax(0, 1fr); }
+  .slide { align-content: start; }
+}
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; min-width: 0; }
+.stat { display: grid; gap: 2px; }
+.stat b { font-family: var(--font-display); font-size: clamp(1.6rem, 3vw, 2.4rem); font-weight: 800; line-height: 1.1; }
+.stat span { color: var(--muted); font-size: .9rem; }
+ul.plain { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+ul.plain li { padding-left: 18px; position: relative; max-width: 60ch; }
+ul.plain li::before { content: ""; position: absolute; left: 0; top: .62em; width: 8px; height: 2px; background: var(--accent); }
+
+/* SVG */
+svg.diagram { width: 100%; height: auto; max-height: 62vh; display: block; overflow: visible; }
+svg.diagram.short { max-height: 34vh; }
+.node { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.wire { fill: none; stroke: var(--line); stroke-width: 2; }
+.core { fill: var(--accent); }
+.ring { fill: none; stroke: var(--accent); stroke-width: 2; }
+.dot { fill: var(--accent); }
+.dot-prob { fill: var(--prob); }
+.t { fill: var(--fg); font-family: var(--font-body); font-size: 13px; }
+.t-mono { fill: var(--fg); font-family: var(--font-mono); font-size: 12px; }
+.t-muted { fill: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+.t-core { fill: #fff; font-family: var(--font-display); font-weight: 800; font-size: 20px; }
+.t-bad { fill: var(--bad); font-family: var(--font-mono); font-size: 12px; }
+.glow { fill: var(--accent); opacity: 0; }
+.diamond { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+.zone-bad { fill: none; stroke: var(--bad); stroke-width: 22; }
+.zone-warn { fill: none; stroke: var(--warn); stroke-width: 22; }
+.zone-ok { fill: none; stroke: var(--ok); stroke-width: 22; }
+.needle { stroke: var(--fg); stroke-width: 4; stroke-linecap: round; }
+.hub { fill: var(--fg); }
+.bin { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.env { fill: var(--prob); }
+.track { stroke: var(--line); stroke-width: 6; stroke-linecap: round; }
+.tick { stroke: var(--prob); stroke-width: 3; }
+.shield { fill: var(--accent); }
+
+/* barras de probabilidade em HTML */
+.bars { display: grid; gap: 8px; }
+.bar { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr) 3rem; gap: 10px; align-items: center; font-size: .9rem; }
+.bar .track-h { height: 10px; background: color-mix(in srgb, var(--line) 55%, transparent); border-radius: 5px; overflow: hidden; }
+.bar .fill { height: 100%; background: var(--line); border-radius: 5px; }
+.bar.win .fill { background: var(--prob); }
+.bar.win { font-weight: 600; }
+.bar .v { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
+.chip { display: inline-block; font-family: var(--font-mono); font-size: .78rem; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.chip.ok { color: var(--ok); } .chip.warn { color: var(--warn); } .chip.bad { color: var(--bad); } .chip.acc { color: var(--accent); }
+
+pre.code { margin: 0; font-family: var(--font-mono); font-size: .82rem; line-height: 1.55; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; overflow-x: auto; }
+
+/* reranking */
+.rerank { position: relative; height: 290px; }
+.rrow { position: absolute; left: 0; right: 0; height: 50px; display: grid; grid-template-columns: minmax(0, 1fr) 7rem 3rem; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; font-size: .9rem; }
+.rrow .txt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* mapa */
+.group h3 { font-size: 1rem; color: var(--accent); font-family: var(--font-mono); font-weight: 500; letter-spacing: .06em; text-transform: uppercase; }
+.group .item { padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.group .item b { font-family: var(--font-display); font-size: 1.05rem; display: block; }
+.group .item span { color: var(--muted); font-size: .88rem; }
+
+.tools { display: grid; gap: 10px; }
+.tool { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: center; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.tool code { font-family: var(--font-mono); font-size: .85rem; }
+
+blockquote.big { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: clamp(1.6rem, 3.4vw, 2.8rem); line-height: 1.15; letter-spacing: -.01em; max-width: 26ch; text-wrap: balance; }
+blockquote.big em { font-style: normal; color: var(--accent); }
+
+/* barra de navegação */
+.nav {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 56px;
+  display: flex; align-items: center; gap: 12px; padding-inline: clamp(16px, 5vw, 80px);
+  border-top: 1px solid var(--line); background: var(--bg);
+}
+.nav button { font: inherit; font-size: .9rem; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.nav button:hover { border-color: var(--accent); }
+.nav button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nav .count { font-family: var(--font-mono); font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 4.5rem; }
+.nav .progress { flex: 1; height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.nav .progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .35s ease; }
+.nav .title { font-family: var(--font-mono); font-size: .78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 30vw; }
+@media (max-width: 600px) { .nav .title, .nav .fs { display: none; } }
+
+@media (prefers-reduced-motion: reduce) { .slide { transition: none; } }
+</style>
+
+<div class="deck" id="deck">
+
+<!-- 1 -->
+<section class="slide active" id="s1" data-anim="hero" data-title="Abertura">
+  <div class="split">
+    <div class="stack">
+      <p class="eyebrow">TypeSafe AI · modelo System One</p>
+      <h1>JEV: decisões em <span class="hl">milissegundos</span></h1>
+      <p class="lead">Um modelo que não escreve texto. Ele recebe um estado e perguntas tipadas e devolve escolhas, notas e probabilidades que o seu código usa direto.</p>
+      <p class="src">Base: ByteByteGo EP227 “Top 9 Places to Use Jev” + docs.typesafe.ai</p>
+    </div>
+    <svg class="diagram" viewBox="0 0 560 360" role="img" aria-label="Entradas variadas entram no JEV e saem como respostas tipadas">
+      <g class="ins">
+        <rect class="node" x="10" y="43" width="120" height="34" rx="6"/><text class="t-mono" x="70" y="64" text-anchor="middle">e-mail</text>
+        <rect class="node" x="10" y="123" width="120" height="34" rx="6"/><text class="t-mono" x="70" y="144" text-anchor="middle">prompt</text>
+        <rect class="node" x="10" y="203" width="120" height="34" rx="6"/><text class="t-mono" x="70" y="224" text-anchor="middle">ticket</text>
+        <rect class="node" x="10" y="283" width="120" height="34" rx="6"/><text class="t-mono" x="70" y="304" text-anchor="middle">tool call</text>
+      </g>
+      <path class="wire" d="M130 60 L246 180 M130 140 L246 180 M130 220 L246 180 M130 300 L246 180"/>
+      <path class="wire" d="M334 180 L400 87 M334 180 L400 180 M334 180 L400 273"/>
+      <circle class="ring" cx="290" cy="180" r="58"/>
+      <circle class="core" cx="290" cy="180" r="44"/>
+      <text class="t-core" x="290" y="187" text-anchor="middle">JEV</text>
+      <g class="outs">
+        <rect class="node" x="400" y="70" width="152" height="34" rx="17"/><text class="t-mono" x="476" y="91" text-anchor="middle">choice · billing</text>
+        <rect class="node" x="400" y="163" width="152" height="34" rx="17"/><text class="t-mono" x="476" y="184" text-anchor="middle">score · 2,4 de 3</text>
+        <rect class="node" x="400" y="256" width="152" height="34" rx="17"/><text class="t-mono" x="476" y="277" text-anchor="middle">noul · 0,97</text>
+      </g>
+      <circle class="dot in-dot" data-y="60" cx="130" cy="60" r="5"/>
+      <circle class="dot in-dot" data-y="140" cx="130" cy="140" r="5"/>
+      <circle class="dot in-dot" data-y="220" cx="130" cy="220" r="5"/>
+      <circle class="dot in-dot" data-y="300" cx="130" cy="300" r="5"/>
+      <circle class="dot-prob out-dot" data-y="87" cx="400" cy="87" r="5"/>
+      <circle class="dot-prob out-dot" data-y="180" cx="400" cy="180" r="5"/>
+      <circle class="dot-prob out-dot" data-y="273" cx="400" cy="273" r="5"/>
+    </svg>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="slide" id="s2" data-anim="race" data-title="O problema">
+  <p class="eyebrow">O problema</p>
+  <h2>Usamos LLMs grandes para decidir coisas pequenas</h2>
+  <div class="split">
+    <div class="stack">
+      <p class="lead">Classificar, filtrar, rotear e dar nota são decisões. Pagar uma geração de texto completa por cada uma é lento e caro.</p>
+      <div class="cols-3">
+        <div class="stat"><b class="mono">70–500 ms</b><span>ponta a ponta</span></div>
+        <div class="stat"><b class="mono">US$ 0,042</b><span>por 1M tokens de entrada</span></div>
+        <div class="stat"><b>grátis</b><span>tokens de saída</span></div>
+      </div>
+      <p class="src">Fonte: blog TypeSafe, “Introducing System One Models and Jev”</p>
+    </div>
+    <div class="panel">
+      <svg class="diagram" viewBox="0 0 560 210" role="img" aria-label="Corrida: o JEV completa várias decisões enquanto um LLM completa uma">
+        <text class="t" x="0" y="64">JEV</text>
+        <text class="t" x="0" y="144">LLM de fronteira</text>
+        <line class="track" x1="140" y1="60" x2="540" y2="60"/>
+        <line class="track" x1="140" y1="140" x2="540" y2="140"/>
+        <circle class="dot" id="race-jev" cx="540" cy="60" r="9"/>
+        <circle class="dot-prob" id="race-llm" cx="540" cy="140" r="9"/>
+        <text class="t-mono" id="race-count" x="140" y="30">decisões do JEV durante 1 resposta do LLM: 30</text>
+        <text class="t-muted" x="140" y="190">ilustrativo: 30× nesta animação; a TypeSafe cita 40× a 200×</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="slide" id="s3" data-anim="sysone" data-title="System One">
+  <p class="eyebrow">O que é um modelo System One</p>
+  <h2>Estado e perguntas tipadas entram. Valores tipados saem.</h2>
+  <div class="cols-3 flow">
+    <div class="stack">
+      <h3>1 · Estado</h3>
+      <pre class="code">{
+  "ticket": "Fui cobrado duas
+    vezes no pedido A-104"
+}</pre>
+    </div>
+    <div class="stack">
+      <h3>2 · Perguntas</h3>
+      <pre class="code">team:    Choice(billing,
+           technical, sales)
+anger:   Score(calm → furious)
+refund:  Noul("pede reembolso?")</pre>
+    </div>
+    <div class="stack">
+      <h3>3 · Respostas</h3>
+      <pre class="code">team   → billing   conf 0,85
+anger  → 1,2 de 3
+refund → 0,97</pre>
+    </div>
+  </div>
+  <p class="lead">O nome vem do “Sistema 1” de Kahneman: o pensamento rápido e intuitivo. O treino (RLCD) busca <b>probabilidades calibradas</b>: quando diz 90%, deve acertar perto de 9 em 10 vezes.</p>
+</section>
+
+<!-- 4 -->
+<section class="slide" id="s4" data-anim="prims" data-title="Primitivas">
+  <p class="eyebrow">As três primitivas</p>
+  <h2>Choice, Score e Noul, todas na mesma chamada</h2>
+  <div class="cols-3">
+    <div class="panel stack">
+      <h3>Choice</h3>
+      <p class="muted">Escolhe uma opção de uma lista. <span class="mono">“Qual time atende?”</span></p>
+      <div class="bars">
+        <div class="bar win"><span>técnico</span><div class="track-h"><div class="fill" style="width:85%"></div></div><span class="v">0,85</span></div>
+        <div class="bar"><span>financeiro</span><div class="track-h"><div class="fill" style="width:15%"></div></div><span class="v">0,15</span></div>
+        <div class="bar"><span>comercial</span><div class="track-h"><div class="fill" style="width:0%"></div></div><span class="v">0,00</span></div>
+      </div>
+      <p class="src">confiança 0,78</p>
+    </div>
+    <div class="panel stack">
+      <h3>Score</h3>
+      <p class="muted">Nota numa escala ordenada. <span class="mono">“Quão frustrado?”</span></p>
+      <div class="bars">
+        <div class="bar"><span>calmo</span><div class="track-h"><div class="fill" style="width:0%"></div></div><span class="v">0,00</span></div>
+        <div class="bar win"><span>frustrado</span><div class="track-h"><div class="fill" style="width:100%"></div></div><span class="v">1,00</span></div>
+        <div class="bar"><span>muito irritado</span><div class="track-h"><div class="fill" style="width:0%"></div></div><span class="v">0,00</span></div>
+      </div>
+      <p class="src">score 1,0 · confiança 1,0</p>
+    </div>
+    <div class="panel stack">
+      <h3>Noul</h3>
+      <p class="muted">Probabilidade de “sim”. <span class="mono">“A mensagem é urgente?”</span></p>
+      <div class="bars">
+        <div class="bar win"><span>sim</span><div class="track-h"><div class="fill" style="width:100%"></div></div><span class="v">1,00</span></div>
+      </div>
+      <p class="src">noul 1,0</p>
+    </div>
+  </div>
+  <p class="src">Exemplo do quick start da TypeSafe: “Estou tentando conectar o Stripe há 3 dias e a integração falha. Estou perdendo vendas.”</p>
+</section>
+
+<!-- 5 -->
+<section class="slide" id="s5" data-anim="principle" data-title="Princípio">
+  <p class="eyebrow">O princípio do ByteByteGo</p>
+  <blockquote class="big">Use o LLM para <em>gerar</em>. Use o JEV nas <em>decisões</em> ao redor dele.</blockquote>
+  <svg class="diagram" viewBox="0 0 800 190" role="img" aria-label="Uma requisição passa por decisões do JEV antes e depois do LLM">
+    <line class="wire" x1="90" y1="90" x2="700" y2="90"/>
+    <rect class="node" x="0" y="66" width="90" height="48" rx="8"/><text class="t" x="45" y="95" text-anchor="middle">pedido</text>
+    <circle class="glow" cx="170" cy="90" r="26"/><rect class="diamond" x="-14" y="-14" width="28" height="28" transform="translate(170 90) rotate(45)"/><text class="t-muted" x="170" y="145" text-anchor="middle">rotear</text>
+    <circle class="glow" cx="260" cy="90" r="26"/><rect class="diamond" x="-14" y="-14" width="28" height="28" transform="translate(260 90) rotate(45)"/><text class="t-muted" x="260" y="145" text-anchor="middle">guardrail</text>
+    <rect class="node" x="330" y="56" width="140" height="68" rx="10"/><text class="t" x="400" y="88" text-anchor="middle" font-weight="600">LLM</text><text class="t-muted" x="400" y="106" text-anchor="middle">gera o texto</text>
+    <circle class="glow" cx="550" cy="90" r="26"/><rect class="diamond" x="-14" y="-14" width="28" height="28" transform="translate(550 90) rotate(45)"/><text class="t-muted" x="550" y="145" text-anchor="middle">liberar tool</text>
+    <circle class="glow" cx="640" cy="90" r="26"/><rect class="diamond" x="-14" y="-14" width="28" height="28" transform="translate(640 90) rotate(45)"/><text class="t-muted" x="640" y="145" text-anchor="middle">avaliar</text>
+    <rect class="node" x="700" y="66" width="96" height="48" rx="8"/><text class="t" x="748" y="95" text-anchor="middle">resposta</text>
+    <circle class="dot" id="pr-dot" cx="90" cy="90" r="7"/>
+    <text class="t-muted" x="215" y="30" text-anchor="middle">◆ = decisão do JEV, em ms</text>
+  </svg>
+</section>
+
+<!-- 6 -->
+<section class="slide" id="s6" data-anim="map" data-title="Os 9 lugares">
+  <p class="eyebrow">Os 9 lugares para usar o JEV</p>
+  <h2>Agrupados por onde a decisão acontece</h2>
+  <div class="cols-4">
+    <div class="group stack">
+      <h3>Antes do LLM</h3>
+      <div class="item"><b>Roteamento de modelos</b><span>qual LLM atende o prompt</span></div>
+      <div class="item"><b>Guardrails</b><span>bloqueia risco antes de seguir</span></div>
+    </div>
+    <div class="group stack">
+      <h3>Dentro do agente</h3>
+      <div class="item"><b>Gating de tool calls</b><span>permissão por categoria</span></div>
+      <div class="item"><b>Decisões em tempo real</b><span>loops sensíveis a latência</span></div>
+    </div>
+    <div class="group stack">
+      <h3>Depois do LLM</h3>
+      <div class="item"><b>Avaliação de LLM</b><span>nota numérica na saída</span></div>
+      <div class="item"><b>Confidence gate</b><span>age conforme a certeza</span></div>
+    </div>
+    <div class="group stack">
+      <h3>Sem LLM nenhum</h3>
+      <div class="item"><b>Triagem de inbox</b><span>urgente, spam, arquivar</span></div>
+      <div class="item"><b>Reranking</b><span>ordena trechos por relevância</span></div>
+      <div class="item"><b>Rotulagem em massa</b><span>map-reduce em tabelas</span></div>
+    </div>
+  </div>
+  <p class="src">Fonte: ByteByteGo, EP227 “Top 9 Places to Use Jev”</p>
+</section>
+
+<!-- 7 -->
+<section class="slide" id="s7" data-anim="routing" data-title="Roteamento">
+  <p class="eyebrow">Cenário 1 · Roteamento de modelos</p>
+  <div class="split">
+    <div class="stack">
+      <h2>Cada prompt vai para o menor modelo que dá conta</h2>
+      <p class="lead">Um Choice com três opções decide em milissegundos. Pergunta fácil não paga preço de modelo grande.</p>
+      <p class="src">probabilidades ilustrativas</p>
+    </div>
+    <svg class="diagram" viewBox="0 0 640 300" role="img" aria-label="O JEV envia cada prompt para o modelo pequeno, médio ou grande">
+      <rect class="node" x="0" y="122" width="230" height="56" rx="8"/>
+      <text class="t" id="rt-prompt" x="115" y="155" text-anchor="middle">“Qual o horário de atendimento?”</text>
+      <path class="wire" d="M230 150 L284 150 M356 150 L470 65 M356 150 L470 150 M356 150 L470 235"/>
+      <circle class="core" cx="320" cy="150" r="36"/><text class="t-core" x="320" y="157" text-anchor="middle" font-size="16">JEV</text>
+      <text class="t-mono" id="rt-prob" x="320" y="210" text-anchor="middle">pequeno · 0,94</text>
+      <circle class="glow rt-glow" cx="550" cy="65" r="44"/>
+      <circle class="glow rt-glow" cx="550" cy="150" r="44"/>
+      <circle class="glow rt-glow" cx="550" cy="235" r="44"/>
+      <rect class="node" x="470" y="40" width="160" height="50" rx="8"/><text class="t" x="550" y="62" text-anchor="middle">Modelo pequeno</text><text class="t-muted" x="550" y="80" text-anchor="middle">$</text>
+      <rect class="node" x="470" y="125" width="160" height="50" rx="8"/><text class="t" x="550" y="147" text-anchor="middle">Modelo médio</text><text class="t-muted" x="550" y="165" text-anchor="middle">$$</text>
+      <rect class="node" x="470" y="210" width="160" height="50" rx="8"/><text class="t" x="550" y="232" text-anchor="middle">Modelo grande</text><text class="t-muted" x="550" y="250" text-anchor="middle">$$$</text>
+      <circle class="dot" id="rt-dot" cx="470" cy="65" r="7"/>
+    </svg>
+  </div>
+</section>
+
+<!-- 8 -->
+<section class="slide" id="s8" data-anim="guard" data-title="Guardrails">
+  <p class="eyebrow">Cenários 2 e 3 · Guardrails e gating de tool calls</p>
+  <h2>Barrar o perigo antes que ele chegue ao LLM ou à ferramenta</h2>
+  <div class="cols-2">
+    <div class="panel stack">
+      <h3>Guardrail na entrada</h3>
+      <svg class="diagram" viewBox="0 0 420 220" role="img" aria-label="Mensagem normal passa; tentativa de injeção é bloqueada">
+        <text class="t-mono" x="0" y="54">“Qual o prazo de entrega?”</text>
+        <text class="t-mono" x="0" y="164">“Ignore as instruções…”</text>
+        <line class="wire" x1="0" y1="70" x2="340" y2="70"/>
+        <line class="wire" x1="0" y1="180" x2="236" y2="180"/>
+        <path class="shield" d="M230 40 L262 52 L262 92 Q262 120 230 136 Q198 120 198 92 L198 52 Z" transform="translate(30 50)"/>
+        <text class="t-core" x="260" y="146" text-anchor="middle" font-size="12">JEV</text>
+        <rect class="node" x="340" y="46" width="78" height="48" rx="8"/><text class="t" x="379" y="75" text-anchor="middle">LLM</text>
+        <circle class="dot-prob" id="gd-ok" cx="340" cy="70" r="7"/>
+        <circle class="dot" id="gd-bad" cx="226" cy="180" r="7"/>
+        <text class="t-bad" id="gd-label" x="260" y="214" text-anchor="middle">bloqueado · injeção 0,99</text>
+      </svg>
+      <p class="src">0,99 é o valor real medido na nossa demo</p>
+    </div>
+    <div class="panel stack">
+      <h3>Tool calls de um agente</h3>
+      <div class="tools">
+        <div class="tool"><code>ler_arquivo("relatorio.pdf")</code><span class="chip ok">permitir</span></div>
+        <div class="tool"><code>enviar_email(para="todos@empresa")</code><span class="chip warn">pedir confirmação</span></div>
+        <div class="tool"><code>apagar_tabela("clientes", env="prod")</code><span class="chip bad">negar</span></div>
+      </div>
+      <p class="muted">Um Choice classifica cada chamada numa categoria de permissão. O código decide o que cada categoria pode fazer.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 9 -->
+<section class="slide" id="s9" data-anim="inbox" data-title="Triagem">
+  <p class="eyebrow">Cenários 4 e 7 · Triagem de inbox e rotulagem em massa</p>
+  <div class="split">
+    <div class="stack">
+      <h2>Volume alto, custo de centavos</h2>
+      <p class="lead">Cada item recebe rótulo, urgência e próxima ação. No lote, o mesmo padrão vira map-reduce sobre tabelas inteiras.</p>
+      <div class="panel stat"><b class="mono">1.000 e-mails</b><span>classificados em cerca de 1 minuto, por uns 3 centavos de dólar</span></div>
+      <p class="src">Fonte: Tiago Oliveira, “Onde o JEV pode substituir um LLM em quase tudo”</p>
+    </div>
+    <svg class="diagram" viewBox="0 0 520 300" role="img" aria-label="E-mails caem em quatro caixas: urgente, responder, arquivar e spam">
+      <rect class="node" x="210" y="0" width="100" height="40" rx="8"/><text class="t" x="260" y="25" text-anchor="middle">caixa de entrada</text>
+      <circle class="core" cx="260" cy="110" r="26"/><text class="t-core" x="260" y="116" text-anchor="middle" font-size="13">JEV</text>
+      <g id="bins">
+        <rect class="bin" x="5" y="210" width="115" height="80" rx="8"/><text class="t" x="62" y="236" text-anchor="middle">urgente</text><text class="t-mono bin-n" x="62" y="270" text-anchor="middle" font-size="20">31</text>
+        <rect class="bin" x="135" y="210" width="115" height="80" rx="8"/><text class="t" x="192" y="236" text-anchor="middle">responder</text><text class="t-mono bin-n" x="192" y="270" text-anchor="middle" font-size="20">128</text>
+        <rect class="bin" x="265" y="210" width="115" height="80" rx="8"/><text class="t" x="322" y="236" text-anchor="middle">arquivar</text><text class="t-mono bin-n" x="322" y="270" text-anchor="middle" font-size="20">402</text>
+        <rect class="bin" x="395" y="210" width="115" height="80" rx="8"/><text class="t" x="452" y="236" text-anchor="middle">spam</text><text class="t-mono bin-n" x="452" y="270" text-anchor="middle" font-size="20">87</text>
+      </g>
+      <g id="envs"></g>
+    </svg>
+  </div>
+</section>
+
+<!-- 10 -->
+<section class="slide" id="s10" data-anim="rerank" data-title="Reranking">
+  <p class="eyebrow">Cenário 5 · Reranking</p>
+  <div class="split">
+    <div class="stack">
+      <h2>Reordenar o que a busca trouxe</h2>
+      <p class="lead">A busca por palavra-chave acha candidatos. O JEV dá uma nota de relevância a cada par pergunta–trecho, e só os melhores vão para o LLM.</p>
+      <div class="panel stat"><b class="mono">38% → 62%</b><span>top-10 em 40 consultas jurídicas (CLERC) com reranking do JEV</span></div>
+      <p class="src">Fonte: cookbook “Re-ranking” da TypeSafe · notas da lista: ilustrativas</p>
+    </div>
+    <div class="stack">
+      <p class="mono muted">Pergunta: “Como cancelo minha assinatura?”</p>
+      <div class="rerank">
+        <div class="rrow" data-from="1" style="top:0px"><span class="txt">Para cancelar, acesse Conta › Plano › Cancelar assinatura.</span><div class="bar win" style="display:block"><div class="track-h"><div class="fill" style="width:96%"></div></div></div><span class="mono">0,96</span></div>
+        <div class="rrow" data-from="3" style="top:60px"><span class="txt">O cancelamento vale ao fim do ciclo de cobrança atual.</span><div class="bar win" style="display:block"><div class="track-h"><div class="fill" style="width:81%"></div></div></div><span class="mono">0,81</span></div>
+        <div class="rrow" data-from="4" style="top:120px"><span class="txt">Você pode pausar a assinatura por até 3 meses.</span><div class="bar" style="display:block"><div class="track-h"><div class="fill" style="width:44%"></div></div></div><span class="mono">0,44</span></div>
+        <div class="rrow" data-from="0" style="top:180px"><span class="txt">Atualize o cartão de crédito em Conta › Pagamento.</span><div class="bar" style="display:block"><div class="track-h"><div class="fill" style="width:12%"></div></div></div><span class="mono">0,12</span></div>
+        <div class="rrow" data-from="2" style="top:240px"><span class="txt">Nosso app está disponível para iOS e Android.</span><div class="bar" style="display:block"><div class="track-h"><div class="fill" style="width:3%"></div></div></div><span class="mono">0,03</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 11 -->
+<section class="slide" id="s11" data-anim="evals" data-title="Evals e tempo real">
+  <p class="eyebrow">Cenários 6 e 8 · Avaliação de LLM e decisões em tempo real</p>
+  <h2>Dar nota em escala e decidir dentro de um loop</h2>
+  <div class="cols-2">
+    <div class="panel stack">
+      <h3>Avaliar a resposta de um LLM</h3>
+      <p class="muted">Rubrica quebrada em Scores atômicos. O peso de cada um fica no código.</p>
+      <div class="bars">
+        <div class="bar win"><span>fiel à fonte</span><div class="track-h"><div class="fill" style="width:93%"></div></div><span class="v">2,8/3</span></div>
+        <div class="bar win"><span>completa</span><div class="track-h"><div class="fill" style="width:70%"></div></div><span class="v">2,1/3</span></div>
+        <div class="bar win"><span>tom adequado</span><div class="track-h"><div class="fill" style="width:100%"></div></div><span class="v">3,0/3</span></div>
+      </div>
+      <p class="src">notas ilustrativas</p>
+    </div>
+    <div class="panel stack">
+      <h3>Loop de tempo real</h3>
+      <svg class="diagram" viewBox="0 0 420 150" role="img" aria-label="Uma decisão a cada 100 milissegundos">
+        <line class="wire" x1="0" y1="80" x2="420" y2="80"/>
+        <g id="ticks">
+          <line class="tick" x1="20" y1="62" x2="20" y2="98"/><line class="tick" x1="60" y1="62" x2="60" y2="98"/>
+          <line class="tick" x1="100" y1="62" x2="100" y2="98"/><line class="tick" x1="140" y1="62" x2="140" y2="98"/>
+          <line class="tick" x1="180" y1="62" x2="180" y2="98"/><line class="tick" x1="220" y1="62" x2="220" y2="98"/>
+          <line class="tick" x1="260" y1="62" x2="260" y2="98"/><line class="tick" x1="300" y1="62" x2="300" y2="98"/>
+          <line class="tick" x1="340" y1="62" x2="340" y2="98"/><line class="tick" x1="380" y1="62" x2="380" y2="98"/>
+          <line class="tick" x1="420" y1="62" x2="420" y2="98"/><line class="tick" x1="460" y1="62" x2="460" y2="98"/>
+        </g>
+        <text class="t-muted" x="20" y="120">← 100 ms →</text>
+        <text class="t-mono" id="rt-count" x="0" y="30">decisões: 600 por minuto</text>
+      </svg>
+      <p class="muted">A TypeSafe jogou <b>Doom</b> com o JEV a 10 consultas por segundo, por cerca de <b class="mono">US$ 7/hora</b>.</p>
+      <p class="src">Fonte: blog TypeSafe</p>
+    </div>
+  </div>
+</section>
+
+<!-- 12 -->
+<section class="slide" id="s12" data-anim="gate" data-title="Confidence gate">
+  <p class="eyebrow">Cenário 9 · Confidence gate</p>
+  <div class="split">
+    <div class="stack">
+      <h2>A resposta diz <span class="hl">o quê</span>. A confiança diz <span class="hl">se</span> agir.</h2>
+      <ul class="plain">
+        <li><b>Confiança alta:</b> o sistema age sozinho.</li>
+        <li><b>Média:</b> pede confirmação a alguém.</li>
+        <li><b>Baixa:</b> encaminha para um humano.</li>
+      </ul>
+      <p class="muted">Os limiares são seus e ficam no código. Na nossa demo, abaixo de 0,6 vai para revisão humana.</p>
+    </div>
+    <svg class="diagram" viewBox="0 0 400 260" role="img" aria-label="Medidor de confiança com zonas humano, confirmar e agir">
+      <path class="zone-bad" d="M50 200 A150 150 0 0 1 246.4 57.3"/>
+      <path class="zone-warn" d="M246.4 57.3 A150 150 0 0 1 342.7 153.6"/>
+      <path class="zone-ok" d="M342.7 153.6 A150 150 0 0 1 350 200"/>
+      <text class="t-muted" x="50" y="225" text-anchor="middle">0</text>
+      <text class="t-muted" x="258" y="40" text-anchor="middle">0,6</text>
+      <text class="t-muted" x="372" y="150" text-anchor="middle">0,9</text>
+      <text class="t-muted" x="350" y="225" text-anchor="middle">1</text>
+      <line class="needle" id="gate-needle" x1="200" y1="200" x2="200" y2="80" transform="rotate(84.6 200 200)"/>
+      <circle class="hub" cx="200" cy="200" r="9"/>
+      <text class="t-mono" id="gate-val" x="200" y="245" text-anchor="middle" font-size="15">0,97 → agir sozinho</text>
+    </svg>
+  </div>
+</section>
+
+<!-- 13 -->
+<section class="slide" id="s13" data-anim="case" data-title="Nosso case">
+  <p class="eyebrow">Nosso case · Central de Atendimento com JEV</p>
+  <h2>Uma mensagem, sete perguntas em paralelo, regras em código</h2>
+  <svg class="diagram short" viewBox="0 0 760 260" role="img" aria-label="Uma mensagem vira sete perguntas paralelas que convergem nas regras de decisão">
+    <rect class="node" x="0" y="105" width="140" height="50" rx="8"/><text class="t" x="70" y="135" text-anchor="middle">mensagem</text>
+    <line class="wire" x1="140" y1="130" x2="222" y2="130"/>
+    <circle class="core" cx="250" cy="130" r="28"/><text class="t-core" x="250" y="136" text-anchor="middle" font-size="14">JEV</text>
+    <g id="case-qs">
+      <text class="t-mono" x="400" y="19" text-anchor="middle">injeção · Noul</text>
+      <text class="t-mono" x="400" y="54" text-anchor="middle">abuso · Noul</text>
+      <text class="t-mono" x="400" y="89" text-anchor="middle">time · Choice</text>
+      <text class="t-mono" x="400" y="124" text-anchor="middle">urgência · Score</text>
+      <text class="t-mono" x="400" y="159" text-anchor="middle">sentimento · Score</text>
+      <text class="t-mono" x="400" y="194" text-anchor="middle">reembolso · Noul</text>
+      <text class="t-mono" x="400" y="229" text-anchor="middle">complexidade · Choice</text>
+    </g>
+    <path class="wire" d="M278 130 L330 15 M278 130 L330 50 M278 130 L330 85 M278 130 L330 120 M278 130 L330 155 M278 130 L330 190 M278 130 L330 225"/>
+    <path class="wire" d="M470 15 L560 130 M470 50 L560 130 M470 85 L560 130 M470 120 L560 130 M470 155 L560 130 M470 190 L560 130 M470 225 L560 130"/>
+    <rect class="node" x="560" y="100" width="200" height="60" rx="8"/><text class="t" x="660" y="126" text-anchor="middle" font-weight="600">regras em Python</text><text class="t-muted" x="660" y="145" text-anchor="middle">bloquear · humano · LLM</text>
+    <circle class="dot" id="case-in" cx="222" cy="130" r="6"/>
+    <g id="case-fan"></g>
+  </svg>
+  <div class="cols-4">
+    <div class="stat"><b class="mono">243–384 ms</b><span>por mensagem, API real</span></div>
+    <div class="stat"><b class="mono">10 de 10</b><span>exemplos na rota certa, em 3 execuções</span></div>
+    <div class="stat"><b class="mono">~US$ 0,00003</b><span>de JEV por mensagem (~676 tokens)</span></div>
+    <div class="stat"><b class="mono">0,028 × 0,20</b><span>US$ no lote de 10: com JEV × tudo no LLM grande*</span></div>
+  </div>
+  <p class="src">* custo de LLM com preços de referência configurados na demo, não chamadas reais</p>
+</section>
+
+<!-- 14 -->
+<section class="slide" id="s14" data-anim="limits" data-title="Limites">
+  <p class="eyebrow">Limites que precisamos levar a sério</p>
+  <div class="split">
+    <div class="stack">
+      <h2>Confiança alta não é garantia de acerto</h2>
+      <ul class="plain">
+        <li>Não gera texto. Para isso continua o LLM ou um template.</li>
+        <li>Escolhe com confiança entre opções erradas quando a certa não está na lista.</li>
+        <li>Funciona melhor em inglês. Na demo, as instruções ficam em inglês.</li>
+        <li>Contas, datas e contagens ficam no código, não no modelo.</li>
+        <li>Sem pesos abertos nem paper: meça a calibração nos seus próprios dados.</li>
+      </ul>
+      <p class="src">Teste independente com regras desconhecidas: 45% de acerto com confiança média de 0,74 (Tiago Oliveira). Docs: “Jev 1.13 jaggedness”.</p>
+    </div>
+    <div class="panel stack">
+      <p class="mono muted">Choice: “Qual é a capital da Austrália?”</p>
+      <div class="bars">
+        <div class="bar win"><span>Sydney</span><div class="track-h"><div class="fill" style="width:88%"></div></div><span class="v">0,88</span></div>
+        <div class="bar"><span>Melbourne</span><div class="track-h"><div class="fill" style="width:10%"></div></div><span class="v">0,10</span></div>
+        <div class="bar"><span>Perth</span><div class="track-h"><div class="fill" style="width:2%"></div></div><span class="v">0,02</span></div>
+      </div>
+      <p><span class="chip bad">errado</span> A resposta certa, Canberra, não estava entre as opções.</p>
+      <p class="src">exemplo ilustrativo do modo de falha</p>
+    </div>
+  </div>
+</section>
+
+<!-- 15 -->
+<section class="slide" id="s15" data-anim="close" data-title="Próximos passos">
+  <p class="eyebrow">Fechamento</p>
+  <h2>Quando faz sentido usar o JEV</h2>
+  <div class="cols-3">
+    <div class="panel stack"><h3>É uma decisão</h3><p class="muted">Classificar, filtrar, rotear, dar nota. Não escrever.</p></div>
+    <div class="panel stack"><h3>As opções são conhecidas</h3><p class="muted">Times, categorias, níveis de risco que dá para listar e descrever.</p></div>
+    <div class="panel stack"><h3>Volume ou latência importam</h3><p class="muted">Milhares de itens por dia, ou uma resposta em menos de meio segundo.</p></div>
+  </div>
+  <div class="cols-2">
+    <div class="stack">
+      <h3>Próximos passos sugeridos</h3>
+      <ul class="plain">
+        <li>Rodar a demo “Central de Atendimento” com a equipe.</li>
+        <li>Escolher um processo interno de triagem para um piloto.</li>
+        <li>Medir acerto e calibração em dados reais antes de automatizar.</li>
+      </ul>
+    </div>
+    <div class="stack">
+      <h3>Referências</h3>
+      <ul class="plain src">
+        <li><a href="https://blog.bytebytego.com/p/ep227-top-9-places-to-use-jev" target="_blank" rel="noopener">ByteByteGo · EP227 Top 9 Places to Use Jev</a></li>
+        <li><a href="https://typesafe.ai/blog/introducing-system-one-models-and-jev" target="_blank" rel="noopener">TypeSafe · Introducing System One Models and Jev</a></li>
+        <li><a href="https://pt.linkedin.com/posts/tiagolivesan_onde-o-jev-pode-substituir-um-llm-em-quase-activity-7510661312696492035-0wXr" target="_blank" rel="noopener">Tiago Oliveira · Onde o JEV pode substituir um LLM</a></li>
+        <li><a href="https://www.linkedin.com/pulse/o-que-%C3%A9-jev-e-eu-aprendi-construindo-uma-cidade-inteira-carraro-dlxae/" target="_blank" rel="noopener">O que é JEV e o que aprendi construindo uma cidade</a></li>
+        <li><a href="https://docs.typesafe.ai/" target="_blank" rel="noopener">docs.typesafe.ai</a></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<nav class="nav" aria-label="Navegação dos slides">
+  <button type="button" id="prev" aria-label="Slide anterior">←</button>
+  <button type="button" id="next" aria-label="Próximo slide">→</button>
+  <span class="count" id="count">1 / 15</span>
+  <span class="title" id="stitle">Abertura</span>
+  <div class="progress" aria-hidden="true"><i id="bar"></i></div>
+  <button type="button" class="fs" id="fs">Tela cheia</button>
+</nav>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(() => {
+  const slides = [...document.querySelectorAll(".slide")];
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const q = (root, sel) => [...root.querySelectorAll(sel)];
+  let cur = 0, ctx = null;
+  // Guarda a largura final de cada barra antes de qualquer animação.
+  document.querySelectorAll(".fill").forEach((f) => { f.dataset.w = f.style.width; });
+  // fromTo com estado final explícito: sobrevive a trocas rápidas de slide no meio de um atraso.
+  const timing = ({ stagger, duration, delay, ease, ...rest }) => [rest, { stagger, duration, delay, ease }];
+  const appear = (t, vars) => { const [from, time] = timing(vars); return gsap.fromTo(t, from, { opacity: 1, x: 0, y: 0, scale: 1, ...time }); };
+  const grow = (t, vars) => { const [, time] = timing(vars); return gsap.fromTo(t, { width: 0 }, { width: (i, f) => f.dataset.w, ...time }); };
+
+  // Cada animação parte do estado final que está no HTML; ctx.revert() volta a ele ao sair do slide.
+  const ANIMS = {
+    hero(el) {
+      appear(q(el, ".stack > *"), { y: 24, opacity: 0, stagger: .1, duration: .6, ease: "power2.out" });
+      gsap.fromTo(q(el, ".ring"), { attr: { r: 50 }, opacity: 1 }, { attr: { r: 76 }, opacity: 0, duration: 1.6, repeat: -1, ease: "power1.out" });
+      const tl = gsap.timeline({ repeat: -1, repeatDelay: .4 });
+      tl.fromTo(q(el, ".in-dot"), { attr: { cx: 130, cy: (i, d) => +d.dataset.y }, opacity: 1 },
+        { attr: { cx: 246, cy: 180 }, duration: .7, stagger: .12, ease: "power1.in" })
+        .set(q(el, ".in-dot"), { opacity: 0 })
+        .fromTo(q(el, ".out-dot"), { attr: { cx: 334, cy: 180 }, opacity: 1 },
+          { attr: { cx: 400, cy: (i, d) => +d.dataset.y }, duration: .35, ease: "power1.out" })
+        .fromTo(q(el, ".outs rect"), { strokeWidth: 1.5 }, { strokeWidth: 3, duration: .15, yoyo: true, repeat: 1 });
+    },
+    race(el) {
+      const label = el.querySelector("#race-count");
+      let n = 0;
+      gsap.fromTo("#race-jev", { attr: { cx: 140 } }, { attr: { cx: 540 }, duration: .3, ease: "none", repeat: -1,
+        onRepeat: () => { n++; label.textContent = `decisões do JEV durante 1 resposta do LLM: ${n}`; } });
+      gsap.fromTo("#race-llm", { attr: { cx: 140 } }, { attr: { cx: 540 }, duration: 9, ease: "none", repeat: -1,
+        onRepeat: () => { n = 0; } });
+    },
+    sysone(el) {
+      appear(q(el, ".flow > div"), { x: -30, opacity: 0, stagger: .35, duration: .6, ease: "power2.out" });
+    },
+    prims(el) {
+      appear(q(el, ".panel"), { y: 20, opacity: 0, stagger: .15, duration: .5 });
+      grow(q(el, ".fill"), { duration: 1.1, stagger: .05, delay: .4, ease: "power3.out" });
+    },
+    principle(el) {
+      const glows = q(el, ".glow");
+      const stops = [170, 260, 400, 550, 640, 700];
+      const tl = gsap.timeline({ repeat: -1, repeatDelay: .6 });
+      tl.set("#pr-dot", { attr: { cx: 90 } });
+      stops.forEach((x, i) => {
+        tl.to("#pr-dot", { attr: { cx: x }, duration: x === 400 ? .9 : .35, ease: "power1.inOut" });
+        const g = { 0: 0, 1: 1, 3: 2, 4: 3 }[i];
+        if (g !== undefined) tl.fromTo(glows[g], { opacity: .45 }, { opacity: 0, duration: .5 }, "<.25");
+        if (x === 400) tl.to({}, { duration: .5 }); // o LLM leva mais tempo
+      });
+    },
+    map(el) {
+      appear(q(el, ".group"), { y: 24, opacity: 0, stagger: .12, duration: .5, ease: "power2.out" });
+    },
+    routing(el) {
+      const cases = [
+        { t: "“Qual o horário de atendimento?”", p: "pequeno · 0,94", y: 65, i: 0 },
+        { t: "“Traduza este e-mail para inglês”", p: "médio · 0,81", y: 150, i: 1 },
+        { t: "“Analise este contrato de 40 páginas”", p: "grande · 0,97", y: 235, i: 2 },
+      ];
+      const prompt = el.querySelector("#rt-prompt"), prob = el.querySelector("#rt-prob");
+      const glows = q(el, ".rt-glow");
+      const tl = gsap.timeline({ repeat: -1 });
+      cases.forEach((c) => {
+        tl.call(() => { prompt.textContent = c.t; prob.textContent = c.p; })
+          .fromTo([prompt, prob], { opacity: 0 }, { opacity: 1, duration: .3 })
+          .fromTo("#rt-dot", { attr: { cx: 230, cy: 150 } }, { attr: { cx: 284, cy: 150 }, duration: .35, ease: "power1.in" })
+          .set("#rt-dot", { attr: { cx: 356 } })
+          .to("#rt-dot", { attr: { cx: 470, cy: c.y }, duration: .4, ease: "power1.out" })
+          .fromTo(glows[c.i], { opacity: .35 }, { opacity: 0, duration: .8 })
+          .to({}, { duration: .5 });
+      });
+    },
+    guard(el) {
+      const tl = gsap.timeline({ repeat: -1, repeatDelay: .8 });
+      tl.set("#gd-label", { opacity: 0 })
+        .set("#gd-bad", { opacity: 1, attr: { r: 7 } })
+        .fromTo("#gd-ok", { attr: { cx: 0 } }, { attr: { cx: 340 }, duration: 1, ease: "none" })
+        .fromTo("#gd-bad", { attr: { cx: 0 } }, { attr: { cx: 226 }, duration: .7, ease: "none" }, "<")
+        .to("#gd-bad", { attr: { r: 14 }, opacity: 0, duration: .35 })
+        .to("#gd-label", { opacity: 1, duration: .2 }, "<");
+      appear(q(el, ".tool"), { x: 30, opacity: 0, stagger: .3, duration: .5, delay: .3 });
+      appear(q(el, ".tool .chip"), { scale: 0, stagger: .3, duration: .35, delay: .7, ease: "back.out(2)" });
+    },
+    inbox(el) {
+      const NS = "http://www.w3.org/2000/svg";
+      const layer = el.querySelector("#envs");
+      const nums = q(el, ".bin-n");
+      const centers = [62, 192, 322, 452];
+      const weights = [0, 1, 1, 2, 2, 2, 2, 2, 3, 1, 2, 3]; // mais "arquivar", como numa caixa real
+      const counts = nums.map((n) => +n.textContent); // continua a contagem a partir dos totais exibidos
+      const envs = weights.map(() => {
+        const r = document.createElementNS(NS, "rect");
+        r.setAttribute("width", 26); r.setAttribute("height", 18); r.setAttribute("rx", 3); r.setAttribute("class", "env");
+        r.setAttribute("x", -13); r.setAttribute("y", -9); layer.appendChild(r); return r;
+      });
+      const tl = gsap.timeline({ repeat: -1 });
+      envs.forEach((e, i) => {
+        const b = weights[i];
+        tl.fromTo(e, { x: 260, y: 40, opacity: 1 }, { x: 260, y: 110, duration: .25, ease: "power1.in" }, i * .18)
+          .to(e, { x: centers[b], y: 250, duration: .35, ease: "power1.out",
+            onComplete: () => { counts[b]++; nums[b].textContent = counts[b]; } }, ">")
+          .to(e, { opacity: 0, duration: .15 }, ">");
+      });
+      tl.to({}, { duration: .8 });
+      return () => envs.forEach((e) => e.remove());
+    },
+    rerank(el) {
+      const tl = gsap.timeline({ repeat: -1, repeatDelay: 1.5 });
+      const rows = q(el, ".rrow");
+      const fills = q(el, ".rrow .fill");
+      tl.set(rows, { top: (i, r) => +r.dataset.from * 60 })
+        .set(fills, { width: 0 })
+        .to({}, { duration: .5 })
+        .to(fills, { width: (i, f) => f.dataset.w, duration: .8, stagger: .08 })
+        .to(rows, { top: (i) => i * 60, duration: .8, ease: "power2.inOut" }, "+=.4");
+    },
+    evals(el) {
+      grow(q(el, ".fill"), { duration: 1, stagger: .2, ease: "power3.out" });
+      const label = el.querySelector("#rt-count");
+      let n = 0;
+      gsap.fromTo("#ticks", { x: 0 }, { x: -40, duration: .1, ease: "none", repeat: -1,
+        onRepeat: () => { n++; if (n % 5 === 0) label.textContent = `decisões: ${n} (uma a cada 100 ms)`; } });
+    },
+    gate(el) {
+      const val = el.querySelector("#gate-val");
+      const steps = [[.97, "agir sozinho"], [.72, "pedir confirmação"], [.41, "encaminhar para humano"]];
+      const tl = gsap.timeline({ repeat: -1 });
+      steps.forEach(([c, txt]) => {
+        tl.to("#gate-needle", { rotation: (c - .5) * 180, svgOrigin: "200 200", duration: .9, ease: "elastic.out(1, .6)" })
+          .call(() => { val.textContent = `${String(c).replace(".", ",")} → ${txt}`; })
+          .to({}, { duration: 1.4 });
+      });
+    },
+    case(el) {
+      const NS = "http://www.w3.org/2000/svg";
+      const layer = el.querySelector("#case-fan");
+      const ys = [15, 50, 85, 120, 155, 190, 225];
+      const dots = ys.map(() => {
+        const c = document.createElementNS(NS, "circle");
+        c.setAttribute("r", 5); c.setAttribute("class", "dot-prob"); c.setAttribute("opacity", 0);
+        layer.appendChild(c); return c;
+      });
+      const tl = gsap.timeline({ repeat: -1, repeatDelay: .6 });
+      tl.fromTo("#case-in", { attr: { cx: 140 }, opacity: 1 }, { attr: { cx: 222 }, duration: .4 })
+        .set("#case-in", { opacity: 0 })
+        .fromTo(dots, { attr: { cx: 278, cy: 130 }, opacity: 1 }, { attr: { cx: 330, cy: (i) => ys[i] }, duration: .35 })
+        .fromTo(q(el, "#case-qs text"), { opacity: .35 }, { opacity: 1, duration: .2 })
+        .set(dots, { attr: { cx: 470 } }, "+=.3")
+        .to(dots, { attr: { cx: 560, cy: 130 }, duration: .4 })
+        .set(dots, { opacity: 0 })
+        .set("#case-in", { opacity: 1, attr: { cx: 222 } });
+      appear(q(el, ".stat"), { y: 16, opacity: 0, stagger: .12, duration: .5, delay: .3 });
+      return () => dots.forEach((d) => d.remove());
+    },
+    limits(el) {
+      appear(q(el, ".plain li"), { x: -20, opacity: 0, stagger: .12, duration: .4 });
+      grow(q(el, ".fill"), { duration: 1, ease: "power3.out", delay: .4 });
+      appear(q(el, ".chip.bad"), { scale: 0, duration: .4, delay: 1.3, ease: "back.out(2)" });
+    },
+    close(el) {
+      appear(q(el, ".cols-3 .panel"), { y: 20, opacity: 0, stagger: .12, duration: .5 });
+    },
+  };
+
+  let cleanup = null;
+  function go(i) {
+    i = Math.max(0, Math.min(slides.length - 1, i));
+    if (ctx) ctx.revert();
+    if (cleanup) cleanup();
+    ctx = null; cleanup = null;
+    slides[cur].classList.remove("active");
+    cur = i;
+    const el = slides[cur];
+    el.classList.add("active");
+    el.scrollTop = 0;
+    document.getElementById("count").textContent = `${cur + 1} / ${slides.length}`;
+    document.getElementById("stitle").textContent = el.dataset.title;
+    document.getElementById("bar").style.width = `${((cur + 1) / slides.length) * 100}%`;
+    try { history.replaceState(null, "", `#${el.id}`); } catch (e) { /* ignorado */ }
+    const anim = ANIMS[el.dataset.anim];
+    if (anim && window.gsap && !reduce) {
+      ctx = gsap.context(() => { cleanup = anim(el) || null; }, el);
+    }
+  }
+
+  document.getElementById("prev").addEventListener("click", () => go(cur - 1));
+  document.getElementById("next").addEventListener("click", () => go(cur + 1));
+  document.getElementById("fs").addEventListener("click", () => {
+    const d = document.documentElement;
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else if (d.requestFullscreen) d.requestFullscreen().catch(() => {});
+  });
+  document.addEventListener("keydown", (e) => {
+    if (["ArrowRight", "PageDown", " "].includes(e.key)) { e.preventDefault(); go(cur + 1); }
+    else if (["ArrowLeft", "PageUp"].includes(e.key)) { e.preventDefault(); go(cur - 1); }
+    else if (e.key === "Home") go(0);
+    else if (e.key === "End") go(slides.length - 1);
+  });
+  let touchX = null;
+  document.addEventListener("touchstart", (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+  document.addEventListener("touchend", (e) => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    if (Math.abs(dx) > 60) go(cur + (dx < 0 ? 1 : -1));
+    touchX = null;
+  });
+
+  const start = slides.findIndex((s) => `#${s.id}` === location.hash);
+  go(start >= 0 ? start : 0);
+})();
+</script>
